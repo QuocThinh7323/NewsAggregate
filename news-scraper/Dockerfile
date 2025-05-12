@@ -10,4 +10,4 @@ COPY . .
 
 RUN go build -o scraper .
 
-CMD ["./scraper"]
+CMD ["./news-scraper"]

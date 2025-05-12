@@ -69,63 +69,116 @@
 // 	r.Run(":8080")
 // }
 
+// package main
+
+// import (
+// 	"context"
+// 	"fmt"
+// 	"io"
+// 	"log"
+// 	"net"
+// 	"net/http"
+// 	"time"
+
+// 	"github.com/go-redis/redis/v8"
+// )
+
+// var (
+// 	rdb = redis.NewClient(&redis.Options{
+// 		Addr: "172.18.0.2:6379", // Đảm bảo Redis container có địa chỉ là redis:6379
+// 	})
+// 	ctx = context.Background()
+// )
+
+// const RATE_LIMIT = 5 // requests per minute
+
+// // Rate limiter middleware
+// func rateLimit(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		// Tách IP client từ RemoteAddr
+// 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+// 		key := fmt.Sprintf("rate_limit:%s", ip)
+
+// 		// Kiểm tra Redis
+// 		val, err := rdb.Get(ctx, key).Int()
+// 		if err != nil && err != redis.Nil {
+// 			log.Printf("❌ Redis GET error: %v", err) // Ghi log lỗi Redis chi tiết
+// 			http.Error(w, "Redis error", http.StatusInternalServerError)
+// 			return
+// 		}
+
+// 		// Kiểm tra số lần request
+// 		if val >= RATE_LIMIT {
+// 			http.Error(w, "Too many requests", http.StatusTooManyRequests)
+// 			return
+// 		}
+
+// 		// Cập nhật số request và hết hạn sau 1 phút
+// 		pipe := rdb.TxPipeline()
+// 		pipe.Incr(ctx, key)
+// 		pipe.Expire(ctx, key, time.Minute)
+// 		_, _ = pipe.Exec(ctx)
+
+// 		// Tiếp tục xử lý request
+// 		next.ServeHTTP(w, r)
+// 	})
+// }
+
+// // Proxy route: /api/articles → article-service
+// func handleArticles(w http.ResponseWriter, r *http.Request) {
+// 	resp, err := http.Get("http://localhost:8081/articles") // hoặc article-service trong Docker
+// 	if err != nil {
+// 		http.Error(w, "Service unavailable", http.StatusInternalServerError)
+// 		return
+// 	}
+// 	defer resp.Body.Close()
+
+// 	// Chuyển tiếp header và body từ article-service
+// 	for k, v := range resp.Header {
+// 		w.Header()[k] = v
+// 	}
+// 	w.WriteHeader(resp.StatusCode)
+// 	_, _ = io.Copy(w, resp.Body)
+// }
+
+// func main() {
+// 	mux := http.NewServeMux()
+
+// 	// Serve static files tại /static/
+// 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./api-gateway/static"))))
+
+// 	// Serve index.html tại root /
+// 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+// 		http.ServeFile(w, r, "./api-gateway/static/index.html")
+// 	})
+
+// 	// Route API
+// 	mux.HandleFunc("/api/articles", handleArticles)
+
+// 	// Bọc middleware rate limit
+// 	rateLimitedHandler := rateLimit(mux)
+
+// 	fmt.Println("🚀 API Gateway chạy tại http://localhost:8082")
+// 	log.Fatal(http.ListenAndServe(":8082", rateLimitedHandler))
+// }
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"time"
-
-	"github.com/go-redis/redis/v8"
 )
 
-var (
-	rdb = redis.NewClient(&redis.Options{
-		Addr: "redis:6379",
-	})
-	ctx = context.Background()
-)
-
-const RATE_LIMIT = 5 // requests per minute
-
-// Rate limiter middleware
-func rateLimit(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		key := fmt.Sprintf("rate_limit:%s", ip)
-
-		val, err := rdb.Get(ctx, key).Int()
-		if err != nil && err != redis.Nil {
-			http.Error(w, "Redis error", http.StatusInternalServerError)
-			return
-		}
-
-		if val >= RATE_LIMIT {
-			http.Error(w, "Too many requests", http.StatusTooManyRequests)
-			return
-		}
-
-		pipe := rdb.TxPipeline()
-		pipe.Incr(ctx, key)
-		pipe.Expire(ctx, key, time.Minute)
-		_, _ = pipe.Exec(ctx)
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// Proxy route: /api/articles → article-service
 func handleArticles(w http.ResponseWriter, r *http.Request) {
-	resp, err := http.Get("http://localhost:8081/articles") // or article-service in Docker
+	resp, err := http.Get("http://localhost:8081/articles") // hoặc dùng article-service nếu chạy bằng Docker Compose
 	if err != nil {
 		http.Error(w, "Service unavailable", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
+	// Forward headers and response
 	for k, v := range resp.Header {
 		w.Header()[k] = v
 	}
@@ -136,10 +189,10 @@ func handleArticles(w http.ResponseWriter, r *http.Request) {
 func main() {
 	mux := http.NewServeMux()
 
-	// Serve static files at /static/
+	// Static files
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./api-gateway/static"))))
 
-	// Serve index.html at root /
+	// Serve index.html at /
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./api-gateway/static/index.html")
 	})
@@ -147,9 +200,6 @@ func main() {
 	// API route
 	mux.HandleFunc("/api/articles", handleArticles)
 
-	// Wrap with rate limiter
-	rateLimitedHandler := rateLimit(mux)
-
-	fmt.Println("🚀 API Gateway running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", rateLimitedHandler))
+	fmt.Println("🚀 API Gateway chạy tại http://localhost:8082")
+	log.Fatal(http.ListenAndServe(":8082", mux))
 }
