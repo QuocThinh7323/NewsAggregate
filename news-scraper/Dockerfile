@@ -1,5 +1,6 @@
-FROM golang:1.23-alpine
-# Removed invalid instruction
+# Stage 1: Build
+FROM golang:1.23-alpine AS builder
+RUN apk add --no-cache build-base
 
 WORKDIR /app
 
@@ -8,6 +9,13 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o scraper .
+RUN go build -o news-scraper .
+
+# Stage 2: Runtime
+FROM alpine:latest
+
+WORKDIR /app
+
+COPY --from=builder /app/news-scraper .
 
 CMD ["./news-scraper"]

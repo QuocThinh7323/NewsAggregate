@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -34,6 +36,8 @@ services:
       - kafka
     networks:
       - backend
+    environment:
+      KAFKA_BROKER: kafka:9092  # Đảm bảo service có thể kết nối Kafka
 
   api-gateway:
     build: ./api-gateway
@@ -43,6 +47,8 @@ services:
       - article-service
     networks:
       - backend
+    environment:
+      KAFKA_BROKER: kafka:9092  # Đảm bảo api-gateway có thể kết nối với Kafka
 
   news-scraper:
     build: ./news-scraper
@@ -50,6 +56,8 @@ services:
       - kafka
     networks:
       - backend
+    environment:
+      KAFKA_BROKER: kafka:9092  # Đảm bảo news-scraper có thể kết nối với Kafka
 
 networks:
   backend:
