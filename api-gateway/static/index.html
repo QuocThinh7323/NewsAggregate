@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>News Aggregator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1rem; }
+    .article { border-bottom: 1px solid #ddd; padding: .5rem 0; cursor: pointer; }
+    .article:hover { background: #f9f9f9; }
+    .title { font-size: 1.2rem; margin: 0; }
+    .meta { font-size: .9rem; color: #555; }
+    .content { margin: .5rem 0 1rem 0; }
+    /* Modal */
+    .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); }
+    .modal-content { background: #fff; margin: 5% auto; padding: 1rem; width: 80%; max-width: 600px; border-radius: 8px; }
+    .close-btn { float: right; cursor: pointer; font-size: 1.2rem; }
+  </style>
+</head>
+<body>
+  <h1>Danh sách bài báo</h1>
+  <div id="articles"></div>
+
+  <!-- Modal chi tiết -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span id="close" class="close-btn">&times;</span>
+      <h2 id="modal-title"></h2>
+      <p class="meta"><strong>Nguồn:</strong> <span id="modal-source"></span> • <strong>Ngày:</strong> <span id="modal-date"></span></p>
+      <p id="modal-content" class="content"></p>
+    </div>
+  </div>
+
+  <script>
+    async function loadArticles() {
+      try {
+        const resp = await fetch('http://localhost:8081/articles');
+        const list = await resp.json();
+        const container = document.getElementById('articles');
+        container.innerHTML = '';
+
+        list.forEach((art, idx) => {
+          const el = document.createElement('div');
+          el.className = 'article';
+          el.dataset.index = idx;
+          el.innerHTML = `
+            <h3 class="title">${art.title}</h3>
+            <p class="meta">${art.source} — ${new Date(art.publishedAt).toLocaleString()}</p>
+          `;
+          el.addEventListener('click', () => showDetail(art));
+          container.appendChild(el);
+        });
+      } catch (err) {
+        console.error('Lỗi khi tải bài báo:', err);
+        document.getElementById('articles').innerText = 'Không tải được dữ liệu.';
+      }
+    }
+
+    function showDetail(art) {
+      document.getElementById('modal-title').innerText = art.title;
+      document.getElementById('modal-source').innerText = art.source;
+      document.getElementById('modal-date').innerText = new Date(art.publishedAt).toLocaleString();
+      document.getElementById('modal-content').innerText = art.content;
+      document.getElementById('modal').style.display = 'block';
+    }
+
+    document.getElementById('close').addEventListener('click', () => {
+      document.getElementById('modal').style.display = 'none';
+    });
+
+    // Đóng modal khi click ngoài khu vực nội dung
+    window.addEventListener('click', e => {
+      if (e.target.id === 'modal') {
+        document.getElementById('modal').style.display = 'none';
+      }
+    });
+
+    // Load ngay khi mở trang
+    loadArticles();
+  </script>
+</body>
+</html>

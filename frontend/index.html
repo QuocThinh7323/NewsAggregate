@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Articles</title>
+</head>
+<body>
+  <h1>Danh sách bài viết</h1>
+  <div id="articles-container"></div>
+
+  <script>
+    // Gọi API để lấy danh sách bài viết
+    fetch('http://localhost:8081/articles')
+      .then(response => response.json())
+      .then(data => {
+        // Hiển thị danh sách bài viết
+        const container = document.getElementById('articles-container');
+        data.forEach(article => {
+          const articleElement = document.createElement('div');
+          articleElement.innerHTML = `
+            <h2>${article.title}</h2>
+            <p><strong>Source:</strong> ${article.source}</p>
+            <p><strong>Published At:</strong> ${article.publishedAt}</p>
+            <p>${article.content}</p>
+            <hr />
+          `;
+          container.appendChild(articleElement);
+        });
+      })
+      .catch(error => console.error('Error fetching articles:', error));
+  </script>
+</body>
+</html>
